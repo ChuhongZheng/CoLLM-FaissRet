@@ -1,3 +1,5 @@
+# python train_collm_mf_din.py --cfg-path=/root/autodl-tmp/CoLLM/train_configs/collm_pretrain_mf_ood.yaml | tee /root/autodl-tmp/CoLLM/logs/lora_train.log
+# CUDA_VISIBLE_DEVICES=0,1 WORLD_SIZE=2 torchrun --nproc_per_node 2 --master_port=11139 train_collm_mf_din.py  --cfg-path=train_configs/collm_pretrain_mf_ood.yaml | tee /root/autodl-tmp/CoLLM/logs/lora_train.log
 model:
   arch: mini_gpt4rec_v2 # by default
   model_type: pretrain_vicuna
@@ -11,7 +13,7 @@ model:
   end_sym: "###"
   prompt_path: "prompts/tallrec_movie.txt"
   prompt_template: '{}'
-  llama_model: "/data/zyang/LLM/PretrainedModels/vicuna/working-v0/" #vicuna path
+  llama_model: "/root/autodl-tmp/CoLLM/vicuna_weights/vicuna-7b-working-v0" #vicuna path
   user_num: -100
   item_num: -100
   ans_type: 'v2' # by default
@@ -26,24 +28,25 @@ model:
     user_num: -100
     item_num: -100
     embedding_size: 256 #embedding size
-    pretrained_path: /data2/zyang/minigpt4rec-log/0912_ml1m_oodv2_best_model_d256lr-0.001wd0.0001.pth # pretrained rec model 
-
+    # pretrained_path: /root/autodl-tmp/CoLLM/PretrainedModels/mf/0918_ml1m_oodv2_best_model_d256_lr8e-04_wd1e-04.pth # pretrained rec model 
+    pretrained_path: not_have
 
   #ckpt: /home/sist/zyang/LLM/minigpt4recLog/20230918143/checkpoint_best.pth # used for CIE tuning or evaluation  
+  # ckpt: /root/autodl-tmp/CoLLM/logs/training/CIE/20250918163/checkpoint_best.pth
 
   
 
 datasets:
   movie_ood:
-    path: "/data/zyang/datasets/ml-1m/" #data path
+    path: "/root/autodl-tmp/CoLLM/collm-datasets/ml-1m/" #data path
     data_type: default
     build_info:
-      storage: "/data/zyang/datasets/ml-1m/" # data path
+      storage: "/root/autodl-tmp/CoLLM/collm-datasets/ml-1m/" # data path
 
 run:
   task: rec_pretrain
   lr_sched: "linear_warmup_cosine_lr"
-  init_lr: 1e-3
+  init_lr: 1e-3 #5e-4 #3e-4
   min_lr: 8e-5
   warmup_lr: 1e-5
   mode: 'v2' # always, please not change it
@@ -52,13 +55,13 @@ run:
   weight_decay: 1e-3 # by default
   max_epoch: 200
   iters_per_epoch: 50 #100 
-  batch_size_train: 16 # 8
-  batch_size_eval: 64 # 32
+  batch_size_train: 4 # 16
+  batch_size_eval: 16 # 64
   num_workers: 4
   warmup_steps: 200
 
   seed: 42
-  output_dir: /data2/zyang/minigpt4rec-log #log and model saving path
+  output_dir: /root/autodl-tmp/CoLLM/logs/training/lora #log and model saving path
 
   amp: True
   resume_ckpt_path: null
