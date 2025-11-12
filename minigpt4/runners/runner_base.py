@@ -11,7 +11,7 @@ import logging
 import os
 import time
 from pathlib import Path
-
+import numpy as np
 import torch
 import torch.distributed as dist
 import webdataset as wds
@@ -688,10 +688,27 @@ class RunnerBase:
 
     @main_process
     def log_stats(self, stats, split_name):
+        # 更健壮的编码器，处理 NumPy 数组和标量
+        class NumpyEncoder(json.JSONEncoder):
+            def default(self, obj):
+                # 处理 NumPy 数组
+                if isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                # 处理 NumPy 标量
+                elif hasattr(obj, 'dtype'):
+                    if obj.dtype.kind in 'iub':  # 整数类型
+                        return int(obj)
+                    elif obj.dtype.kind in 'f':  # 浮点类型
+                        return float(obj)
+                    elif obj.dtype.kind in 'c':  # 复数类型
+                        return {'real': obj.real, 'imag': obj.imag}
+                # 对于其他类型，使用默认处理
+                return super().default(obj)
+        
         if isinstance(stats, dict):
             log_stats = {**{f"{split_name}_{k}": v for k, v in stats.items()}}
             with open(os.path.join(self.output_dir, "log.txt"), "a") as f:
-                f.write(json.dumps(log_stats) + "\n")
+                f.write(json.dumps(log_stats,cls=NumpyEncoder) + "\n")
         elif isinstance(stats, list):
             pass
 
