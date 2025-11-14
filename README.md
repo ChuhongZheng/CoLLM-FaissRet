@@ -41,17 +41,21 @@ conda activate minigpt4
 
 ***Code Structure:*** 
 
-> ├──minigpt4: Core code of CoLLM-FaissRet, following the structure of MiniGPT-4.
->     ├── models: Defines our CoLLM-FaissRet model architecture.
->     ├── datasets: Defines dataset classes.
->     ├── task: A overall task class, defining the used model and datasets, training epoch and evaluation.
->     ├── runners: A runner class to train and evaluate a model based on a task.
->     ├── common: Commonly used functions.
-> ├──dataset: Dataset pre-processing.
-> ├──prompt: Used prompts.
-> ├──train_configs: Training configuration files, setting hyperparameters.
-> ├──train_collm_xx.py CoLLM-FaissRet training file.
-> ├──baseline_train_xx.py: Baseline training file.
+---
+
+├──minigpt4: Core code of CoLLM, following the structure of MiniGPT-4.
+    ├── models: Defines our CoLLM model architecture.
+    ├── datasets: Defines dataset classes.
+    ├── task: A overall task class, defining the used model and datasets, training epoch and evaluation.
+    ├── runners: A runner class to train and evaluate a model based on a task.
+    ├── common: Commonly used functions.
+├──dataset: Dataset pre-processing.
+├──prompt: Used prompts.
+├──train_configs: Training configuration files, setting hyperparameters.
+├──train_collm_xx.py CoLLM training file.
+├──baseline_train_xx.py: Baseline training file.
+
+---
 
 **Note:** For the meaning of the parameters involved in train_configs, please read the comments of collm_pretrain_mf_ood.yaml. The parameters in other train_config files have the same meaning.
 
@@ -82,12 +86,16 @@ python -m fastchat.model.apply_delta --base /path/to/llama-13bOR7b-hf/  --target
 
 The final weights would be in a single folder in a structure similar to the following:
 
-> vicuna_weights
-> ├── config.json
-> ├── generation_config.json
-> ├── pytorch_model.bin.index.json
-> ├── pytorch_model-00001-of-00003.bin
-> ...   
+---
+
+vicuna_weights
+├── config.json
+├── generation_config.json
+├── pytorch_model.bin.index.json
+├── pytorch_model-00001-of-00003.bin
+...   
+
+---
 
 Then, set the path to the vicuna weight in the `"llama_model" ` field of a traing config file, e.g., [here](train_configs/collm_pretrain_mf_ood.yaml#L15)  for CoLLM-FaissRet.
 
