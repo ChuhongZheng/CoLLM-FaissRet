@@ -35,43 +35,59 @@ Git clone our repository, creating a python environment and ativate it via the f
 git clone https://github.com/ChuhongZheng/CoLLM-FaissRet.git
 cd CoLLM-FaissRet
 conda env create -f environment.yml
+pip install -r requirements.txt
 conda activate minigpt4
 ```
 
 ***Code Structure:*** 
 
+> ├──minigpt4: Core code of CoLLM-FaissRet, following the structure of MiniGPT-4.
+>     ├── models: Defines our CoLLM-FaissRet model architecture.
+>     ├── datasets: Defines dataset classes.
+>     ├── task: A overall task class, defining the used model and datasets, training epoch and evaluation.
+>     ├── runners: A runner class to train and evaluate a model based on a task.
+>     ├── common: Commonly used functions.
+> ├──dataset: Dataset pre-processing.
+> ├──prompt: Used prompts.
+> ├──train_configs: Training configuration files, setting hyperparameters.
+> ├──train_collm_xx.py CoLLM-FaissRet training file.
+> ├──baseline_train_xx.py: Baseline training file.
 
-```
-├──minigpt4: Core code of CoLLM-FaissRet, following the structure of MiniGPT-4.
-    ├── models: Defines our CoLLM-FaissRet model architecture.
-    ├── datasets: Defines dataset classes.
-    ├── task: A overall task class, defining the used model and datasets, training epoch and evaluation.
-    ├── runners: A runner class to train and evaluate a model based on a task.
-    ├── common: Commonly used functions.
-├──dataset: Dataset pre-processing.
-├──prompt: Used prompts.
-├──train_configs: Training configuration files, setting hyperparameters.
-├──train_collm_xx.py CoLLM-FaissRet training file.
-├──baseline_train_xx.py: Baseline training file.
-
-```
-Note: For the meaning of the parameters involved in train_configs, please read the comments of collm_pretrain_mf_ood.yaml. The parameters in other train_config files have the same meaning.
+**Note:** For the meaning of the parameters involved in train_configs, please read the comments of collm_pretrain_mf_ood.yaml. The parameters in other train_config files have the same meaning.
 
 **2. Prepare the pretrained Vicuna weights**
 
 The current version of CoLLM-FaissRet is built on the v0 versoin of Vicuna-7B.
-Please refer to Mini-GPT4's instruction [here](PrepareVicuna.md) 
-to prepare the Vicuna weights.
+
+To prepare Vicuna’s weight, first download Vicuna’s **delta** weight from [https://huggingface.co/lmsys/vicuna-13b-delta-v0](https://huggingface.co/lmsys/vicuna-13b-delta-v0). 
+In case you have git-lfs installed (https://git-lfs.com), this can be done by
+
+```bash
+git lfs install
+git clone https://huggingface.co/lmsys/vicuna-13b-delta-v0  # more powerful, need at least 24G gpu memory
+# or
+git clone https://huggingface.co/lmsys/vicuna-7b-delta-v0  # smaller, need 12G gpu memory
+```
+
+Note that this is not directly the working weight, but the difference between the working weight and the original weight of LLAMA-13B. (Due to LLAMA’s rules, we cannot distribute the weight of LLAMA.)
+
+Then, you need to obtain the original LLAMA-7B or LLAMA-13B weights in the HuggingFace format 
+either following the instruction provided by HuggingFace [here](https://huggingface.co/docs/transformers/main/model_doc/llama) or from the Internet. 
+
+When these two weights are ready, we can use tools from Vicuna’s team to create the real working weight.
+
+```bash
+python -m fastchat.model.apply_delta --base /path/to/llama-13bOR7b-hf/  --target /path/to/save/working/vicuna/weight/  --delta /path/to/vicuna-13bOR7b-delta-v0/
+```
+
 The final weights would be in a single folder in a structure similar to the following:
 
-```
-vicuna_weights
-├── config.json
-├── generation_config.json
-├── pytorch_model.bin.index.json
-├── pytorch_model-00001-of-00003.bin
-...   
-```
+> vicuna_weights
+> ├── config.json
+> ├── generation_config.json
+> ├── pytorch_model.bin.index.json
+> ├── pytorch_model-00001-of-00003.bin
+> ...   
 
 Then, set the path to the vicuna weight in the `"llama_model" ` field of a traing config file, e.g., [here](train_configs/collm_pretrain_mf_ood.yaml#L15)  for CoLLM-FaissRet.
 
@@ -87,16 +103,16 @@ The training of CoLLM-FaissRet contains two stages:
 To endow the cold-start recommendation capabilities of LLM, our initial focus is on fine-tuning the LoRA module to learn recommendation tasks independently of collaborative information. That is, we solely utilize the text-only segment of the prompt (e.g., "prompt_/tallrec_movie.txt") to generate predictions and minimize prediction errors for tuning the LoRA module to learning recommendation.
 
 When implementing, you need to set the hyper-parameters in the training config file (e.g., [train_configs/collm_pretrain_mf_ood.yaml](train_configs/collm_pretrain_mf_ood.yaml)) as follows:
-```
+```yaml
 - freeze_rec: True # freeze the collaborative rec model
 - freeze_proj: True  # freeze the mapping function or not
 - freeze_lora: False # tuning the LoRA module
 - prompt_path: "prompt_/tallrec_movie.txt" # use the prompt without the user/item IDs
-- ckpt: None # without pretrained LoRA and FECE (LoRA), you can aslo directly delete this hypee-parameter 
+- ckpt: None # without pretrained LoRA and FECE (LoRA), you can also directly delete this hypee-parameter 
 - evaluate：False #set training
 ```
 
-To launch the first stage training, run the following command. In our experiments, we use 2 A100. 
+To launch the first stage training, run the following command. In our experiments, we use 2 RTX 4090. 
 ```bash
 CUDA_VISIBLE_DEVICES=6,7 WORLD_SIZE=2 nohup torchrun --nproc-per-node 2 --master_port=11139 train_collm_mf_din.py  --cfg-path=train_configs/collm_pretrain_mf_ood.yaml > /log.out &
 ```
@@ -106,7 +122,7 @@ CUDA_VISIBLE_DEVICES=6,7 WORLD_SIZE=2 nohup torchrun --nproc-per-node 2 --master
 In this step, we tune the FECE module while keeping all other components frozen The objective of this tuning step is to enable the FECE module to learn how to extract and map collaborative information effectively for LLM usage in recommendations. To achieve this, we utilize prompts containing user/item IDs to generate predictions and tune the FECE model to minimize prediction errors. 
 When implementing, you need set the hyper-parameters in the training config file as follows:
 
-```
+```yaml
 - freeze_rec: True # freeze the collaborative rec model
 - freeze_proj: False  # tuning the mapping function or not
 - freeze_lora: True # freeze the LoRA module
@@ -120,7 +136,7 @@ Then run the same command to the stage 1.
 
 ### Evaluation
 Set the hyper-parameters in the training config file as follows:
-```
+```yaml
 - ckpt: your_checkpoint_path # trained model path
 - evaluate: True # only evaluate
 ```
